@@ -29,13 +29,17 @@ The activity dateframe is subsetted to include only those values with steps meas
 
 ```{r meanCalcs, fig.height=4}
 library(ggplot2)
+# subset data to only include step measurements with values (non-NA values)
 activeDays <- activity[!is.na(activity$steps),]
+# calculate total number of steps taken per day
 totalSteps <- tapply(activeDays$steps,activeDays$dateFactor,sum)
 totalSteps <- as.data.frame(totalSteps)
 totalSteps$date <- as.factor(row.names(totalSteps))
 names(totalSteps) <- c("totSteps","date")
+# create histogram of total steps taken per day
 stepHisto <- ggplot(totalSteps,aes(x=totSteps)) + geom_histogram(binwidth=1000,color="black",fill="dodgerblue4") + labs(x="Total Steps Taken Per Day",y="Frequency")
 print(stepHisto)
+# calculate mean and median total steps taken per day
 meanTotSteps <- mean(totalSteps$totSteps,na.rm=TRUE)
 meanTotSteps
 medianTotSteps <- median(totalSteps$totSteps,na.rm=TRUE)
@@ -45,12 +49,17 @@ medianTotSteps
 The mean total number of steps taken per day is `r meanTotSteps` and the median total number of steps taken per day is `r medianTotSteps`.  
 
 ## What is the average daily activity pattern?
+The daily activity pattern is described as the mean number of steps taken in each 5 minute interval over the course of a day, ranging from 0 to 2355 (corresponding to 12:00am to 11:55pm).  
 ```{r dailyPattern, fig.height=4}
+# create factor variable for the interval value
 activeDays$intFactor <- factor(activeDays$interval)
+# calculate mean number of steps taken in each 5 minute interval
 meanStepPattern <- as.data.frame(tapply(activeDays$steps,activeDays$intFactor,mean))
 meanStepPattern$interval <- as.numeric(row.names(meanStepPattern))
 names(meanStepPattern) <- c("meanSteps","interval")
+# determine the 5-minute interval during which, on average, the most steps are taken
 maxInt <- meanStepPattern$interval[which.max(meanStepPattern$meanSteps)]
+# create time series plot of mean number of steps as a function of 5-min interval
 pattern <- ggplot(meanStepPattern,aes(x=interval,y=meanSteps)) + geom_line(color="dodgerblue4") + labs(x="Time Interval",y="Mean Steps",title="Mean Steps Taken as a Function of Time of Day")
 print(pattern)
 maxInt
@@ -59,16 +68,20 @@ The 5-minute time interval during which, on average, the most steps are taken is
 
 ## Inputing missing values
 ```{r missingValues}
+# calculate number of NA values
 numNA <- sum(is.na(activity$steps))
 numNA
-daysNA <- numNA/8
+# calculate number of days of NA values
+daysNA <- numNA/288 # 12 five-minute intervals per hour = 288 five-minute intervals per day
 idxNA <- which(is.na(activity$steps))
 activity.fill <- activity
+# calculate rounded mean number of steps taken per 5 minute interval across all days
 meanStepPattern$meanStepsRound <- round(meanStepPattern$meanSteps)
+# fill in NA values with the rounded mean values
 for (i in 1:length(idxNA)) {
     activity.fill$steps[idxNA[i]] <- meanStepPattern$meanStepsRound[meanStepPattern$interval==activity.fill$interval[idxNA[i]]]
 }
-
+# calculate total number of steps taken per day for the filled in dataset
 totalStepsFill <- tapply(activity.fill$steps,activity.fill$dateFactor,sum)
 totalStepsFill <- as.data.frame(totalStepsFill)
 totalStepsFill$date <- as.factor(row.names(totalStepsFill))
@@ -77,21 +90,33 @@ names(totalStepsFill) <- c("totSteps","date")
 The number of missing values (i.e., rows with NA for the step value) is `r numNA`, which corresponds to `r daysNA` days of missing values. The missing values (NAs) were filled in using the mean number of steps for that interval across all days, rounded to the nearest integer. A histogram of the total number of steps taken per day with the filled in data is shown below.  
 
 ```{r missingValueResults, fig.height=4}
+# create ggplot histogram of total number of steps taken per day
 stepHisto2 <- ggplot(totalStepsFill,aes(x=totSteps)) + geom_histogram(binwidth=1000,color="black",fill="dodgerblue4") + labs(x="Total Steps Taken Per Day (Filled in Data)",y="Frequency")
 print(stepHisto2)
-
+# calculate histogram data for the original data set (Na values removed)
 stepHistoData <- hist(totalSteps$totSteps,plot=FALSE,breaks=25)
+# determine the maximum frequency value for steps taken per day (i.e., count value)
 maxFreqIdx <- which.max(stepHistoData$counts)
 maxFreq <- stepHistoData$counts[maxFreqIdx]
+# find the range of steps taken that corresponds to that maximum frequency value
 maxLowRange <- stepHistoData$breaks[maxFreqIdx]
 maxHighRange <- stepHistoData$breaks[maxFreqIdx+1]
 
+# calculate histogram data for the filled in data set (Na values filled 
+# with rounded mean # of steps)
 stepHistoData2 <- hist(totalStepsFill$totSteps,plot=FALSE,breaks=25)
+# similarly calculate maximum frequency value for steps taken per day
 maxFreqIdx2 <- which.max(stepHistoData2$counts)
 maxFreq2 <- stepHistoData2$counts[maxFreqIdx2]
+# find the rnage of steps taken that corresponds to that maximum frequency 
+# value for the filled in data
 maxLowRange2 <- stepHistoData2$breaks[maxFreqIdx2]
 maxHighRange2 <- stepHistoData2$breaks[maxFreqIdx2+1]
 
+# prepare characters/strings to be displayed based on the differences in the
+# step ranges for the maximum frequency values and the maximum frequency values
+# for the original data set (NA values removed) and the inputted data set
+# (NA values filled in)
 totStepImpact <- "The inputting of rounded mean values for missing (NA) values "
 
 if ((maxLowRange2 == maxLowRange) & (maxHighRange2 == maxHighRange)) {
@@ -105,7 +130,7 @@ if (maxFreq2 == maxFreq) {
 } else {
     totStepImpact <- paste0(totStepImpact,"The inputting of rounded mean values for missing (NA) values changed the maximum frequency (count) of total number of steps per day from ",maxFreq," to ",maxFreq2,".\n")
 }
-
+# calculate mean and median of total steps taken per day for the filled in dataset
 meanTotStepsFill <- mean(totalStepsFill$totSteps,na.rm=TRUE)
 meanTotStepsFill
 medianTotStepsFill <- median(totalStepsFill$totSteps,na.rm=TRUE)
@@ -115,9 +140,13 @@ For the filled in data, the mean total number of steps taken per day is `r meanT
 
 ## Are there differences in activity patterns between weekdays and weekends?
 ```{r dayOfweekPattern}
+# set day of week for each date the data was collected
 activity.fill$dayOfWeek <- weekdays(activity.fill$date)
+# set a factor variable for the daytype (either "weekday" or "weekend"), filled with NAs
 activity.fill$dayType <- factor(rep(NA,nrow(activity.fill)),levels=c("weekday","weekend"))
+# set dayType equal to "weekend" if dayOfWeek is "Saturday" or "Sunday"
 activity.fill$dayType[activity.fill$dayOfWeek %in% c("Saturday","Sunday")] <- "weekend"
+# set dayType equal to "weekday" if dayType was still an NA value
 activity.fill$dayType[is.na(activity.fill$dayType)] <- "weekday"
 
 pattern2 <- ggplot(activity.fill,aes(x=interval,y=steps, color=dayType)) + stat_summary(fun.y=mean,geom="line") + facet_wrap(~dayType, nrow=2) + labs(x="Time Interval",y="Mean Steps",title="Mean Steps Taken as a Function of Time of Day")
